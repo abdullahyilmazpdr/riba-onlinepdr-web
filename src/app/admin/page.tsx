@@ -14,6 +14,8 @@ import RibaScoreTable from '@/components/RibaScoreTable';
 import QrCodeModal from '@/components/QrCodeModal';
 import ManualEntryModal from '@/components/ManualEntryModal';
 import AdminSetupWizard from '@/components/AdminSetupWizard';
+import RiskSwitchButton from '@/components/RiskSwitchButton';
+import { useSessionTimeout, clearSessionActivity } from '@/lib/useSessionTimeout';
 import {
   ClipboardCheck,
   Sparkles,
@@ -120,6 +122,15 @@ export default function AdminDashboardPage() {
     url: string;
   } | null>(null);
   const [manualModal, setManualModal] = useState<ClassCardItem | null>(null);
+
+  useSessionTimeout({
+    sessionKey: 'admin_session',
+    enabled: authReady,
+    logoutRedirectUrl: '/login',
+    onLogout: () => {
+      signOut(auth).catch(() => {});
+    },
+  });
 
   const loadSchoolData = useCallback(
     async (key: string, sheetId: string, uid: string, fresh = false, silent = false) => {
@@ -435,7 +446,9 @@ export default function AdminDashboardPage() {
     await signOut(auth).catch(() => {});
     localStorage.removeItem('google_access_token');
     localStorage.removeItem('admin_active_school_key');
+    localStorage.removeItem('active_spreadsheet_id');
     localStorage.removeItem('sso_admin_session');
+    clearSessionActivity('admin_session');
     router.push('/login');
   };
 
@@ -515,6 +528,8 @@ export default function AdminDashboardPage() {
                 <option value="__new__">+ Yeni Okul Ekle</option>
               </select>
             )}
+
+            <RiskSwitchButton role="admin" schoolKey={activeKey} />
 
             <button
               type="button"

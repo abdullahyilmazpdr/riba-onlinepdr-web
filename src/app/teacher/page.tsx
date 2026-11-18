@@ -24,8 +24,10 @@ import {
 import RibaScoreTable from '@/components/RibaScoreTable';
 import QrCodeModal from '@/components/QrCodeModal';
 import ManualEntryModal from '@/components/ManualEntryModal';
+import RiskSwitchButton from '@/components/RiskSwitchButton';
 import { RibaLevel } from '@/lib/riba-data';
 import { ClassRibaResult } from '@/lib/riba-scoring';
+import { useSessionTimeout, clearSessionActivity } from '@/lib/useSessionTimeout';
 
 interface TeacherSession {
   schoolKey: string;
@@ -104,6 +106,12 @@ export default function TeacherDashboardPage() {
     []
   );
 
+  useSessionTimeout({
+    sessionKey: 'teacher_session',
+    enabled: Boolean(session),
+    logoutRedirectUrl: '/teacher/login',
+  });
+
   useEffect(() => {
     const raw = localStorage.getItem('teacher_session');
     const tok = localStorage.getItem('teacher_session_token') || '';
@@ -173,6 +181,7 @@ export default function TeacherDashboardPage() {
   const handleLogout = () => {
     localStorage.removeItem('teacher_session');
     localStorage.removeItem('teacher_session_token');
+    clearSessionActivity('teacher_session');
     router.push('/teacher/login');
   };
 
@@ -203,6 +212,7 @@ export default function TeacherDashboardPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <RiskSwitchButton role="teacher" />
             {session.teacher.isAdmin && (
               <Link
                 href="/admin"

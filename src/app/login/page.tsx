@@ -9,9 +9,15 @@ import {
   getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
+  signOut,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getSchoolsByAdmin } from '@/lib/db';
+import {
+  INACTIVITY_TIMEOUT_MS,
+  touchSessionActivity,
+  clearSessionActivity,
+} from '@/lib/useSessionTimeout';
 import toast from 'react-hot-toast';
 import { ClipboardCheck, ShieldCheck, ArrowRight, Users, Sparkles } from 'lucide-react';
 
@@ -32,6 +38,7 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const finalizeSignedInUser = async (uid: string, accessToken?: string) => {
+    touchSessionActivity('admin_session');
     if (accessToken) {
       localStorage.setItem('google_access_token', accessToken);
     }
@@ -72,7 +79,15 @@ export default function LoginPage() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        const lastRaw = localStorage.getItem('admin_session_last_active');
+        if (lastRaw && Date.now() - parseInt(lastRaw, 10) >= INACTIVITY_TIMEOUT_MS) {
+          await signOut(auth).catch(() => {});
+          clearSessionActivity('admin_session');
+          if (mounted) setCheckingAuth(false);
+          return;
+        }
         try {
+          if (!lastRaw) touchSessionActivity('admin_session');
           const schools = await getSchoolsByAdmin(user.uid);
           if (schools.length > 0) {
             const active = schools[0];
@@ -193,9 +208,20 @@ export default function LoginPage() {
             <Users className="w-4 h-4" />
             Sınıf / Branş Öğretmeni Misiniz? Buradan Girin
           </Link>
-          <Link href="/" className="text-xs text-slate-400 hover:text-slate-600">
-            ← Ana Sayfaya Dön
-          </Link>
+          <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
+            <a
+              href="https://risk.onlinepdr.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-indigo-600 hover:underline"
+            >
+              Risk Haritası Paneli →
+            </a>
+            <span>•</span>
+            <Link href="/" className="hover:text-slate-600">
+              ← Ana Sayfaya Dön
+            </Link>
+          </div>
         </div>
       </div>
     </div>

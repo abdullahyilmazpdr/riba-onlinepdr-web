@@ -102,9 +102,11 @@ export default function HomePage() {
           <nav className="flex items-center gap-2 sm:gap-3">
             <a
               href="https://risk.onlinepdr.com"
-              className="hidden md:inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-700 px-2.5 sm:px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
             >
-              Risk Haritası Paneli
+              Risk Haritası
             </a>
             <Link
               href="/teacher/login"

@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { touchSessionActivity } from '@/lib/useSessionTimeout';
 
 function SsoProcessor() {
   const router = useRouter();
@@ -46,6 +47,7 @@ function SsoProcessor() {
               academicYear: data.academicYear,
             })
           );
+          touchSessionActivity('admin_session');
           router.replace('/admin');
         } else if (data.sessionType === 'teacher') {
           localStorage.setItem('teacher_session_token', data.sessionToken);
@@ -59,6 +61,7 @@ function SsoProcessor() {
               teacher: data.teacher,
             })
           );
+          touchSessionActivity('teacher_session');
           router.replace('/teacher');
         }
       })

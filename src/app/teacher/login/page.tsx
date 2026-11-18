@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { touchSessionActivity } from '@/lib/useSessionTimeout';
 import { Users, KeyRound, School, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 function TeacherLoginForm() {
@@ -83,6 +84,7 @@ function TeacherLoginForm() {
           teacher: data.teacher,
         })
       );
+      touchSessionActivity('teacher_session');
       toast.success(`Hoş geldiniz, ${data.teacher.name}!`);
       router.push('/teacher');
     } catch {
@@ -200,6 +202,14 @@ function TeacherLoginForm() {
             <Link href="/login" className="font-semibold text-indigo-600 hover:underline">
               PDR / Yönetici Girişi
             </Link>
+            <a
+              href="https://risk.onlinepdr.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-emerald-700 hover:underline"
+            >
+              Risk Haritası Paneli
+            </a>
             <Link href="/" className="hover:text-slate-700">
               Ana Sayfa
             </Link>
