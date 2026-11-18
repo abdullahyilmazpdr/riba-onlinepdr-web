@@ -2808,12 +2808,18 @@ export function extractGradeNumber(className: string): number | null {
 
 export function isPreschoolClassName(className: string): boolean {
   const lower = normalizeTrLower(className);
+  const isSpecialEd =
+    lower.includes('özel eğitim') ||
+    lower.includes('ozelegitim') ||
+    lower.includes('öeiu') ||
+    lower.includes('öeıu') ||
+    lower.includes('kademe');
   return (
     lower.includes('anasınıf') ||
     lower.includes('ana sınıf') ||
     lower.includes('okul öncesi') ||
     lower.includes('okuloncesi') ||
-    lower.includes('uygulama sınıf') ||
+    (!isSpecialEd && lower.includes('uygulama sınıf')) ||
     /\b[345]\s*ya[şs]\b/.test(lower)
   );
 }
@@ -2934,15 +2940,21 @@ export function detectSchoolProfile(
   }
 
   const detectedGrades = Array.from(detectedGradesSet).sort((a, b) => a - b);
+  const lowerAsciiI = lower.replace(/ı/g, 'i');
+  const isSpecialEdTier3 = /(?:^|\b)(?:iii|3)\s*\.?\s*kademe\b/.test(lowerAsciiI);
+  const isSpecialEdTier2 = !isSpecialEdTier3 && /(?:^|\b)(?:ii|2)\s*\.?\s*kademe\b/.test(lowerAsciiI);
+  const isSpecialEdTier1 = !isSpecialEdTier3 && !isSpecialEdTier2 && /(?:^|\b)(?:i|1)\s*\.?\s*kademe\b/.test(lowerAsciiI);
+
   const nameMatchesPreschool =
     lower.includes('anaokulu') ||
     lower.includes('ana okulu') ||
     lower.includes('okul öncesi');
-  const nameMatchesPrimary = lower.includes('ilkokul');
+  const nameMatchesPrimary = lower.includes('ilkokul') || isSpecialEdTier1;
   const nameMatchesMiddle =
     lower.includes('ortaokul') ||
     lower.includes('imam hatip ortaokul') ||
-    /\biho\b/.test(lower);
+    /\biho\b/.test(lower) ||
+    isSpecialEdTier2;
   const nameMatchesHigh =
     (lower.includes('lise') ||
       lower.includes('mtal') ||
@@ -2951,7 +2963,8 @@ export function detectSchoolProfile(
       lower.includes('anadolu lise') ||
       lower.includes('fen lise') ||
       lower.includes('çpal') ||
-      /\bihl\b/.test(lower)) &&
+      /\bihl\b/.test(lower) ||
+      isSpecialEdTier3) &&
     !nameMatchesMiddle;
 
   const levels = new Set<RibaLevel>();

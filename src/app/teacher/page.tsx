@@ -74,15 +74,17 @@ export default function TeacherDashboardPage() {
   const [manualModal, setManualModal] = useState<ClassCardItem | null>(null);
 
   const fetchResults = useCallback(
-    async (sess: TeacherSession, sessToken: string, fresh = false) => {
-      setLoading(true);
+    async (sess: TeacherSession, sessToken: string, _fresh = false, silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const url = new URL('/api/riba/results', window.location.origin);
         url.searchParams.set('schoolKey', sess.schoolKey);
         if (sess.spreadsheetId) url.searchParams.set('spreadsheetId', sess.spreadsheetId);
-        if (fresh) url.searchParams.set('fresh', '1');
+        url.searchParams.set('fresh', '1');
+        url.searchParams.set('_t', Date.now().toString());
 
         const res = await fetch(url.toString(), {
+          cache: 'no-store',
           headers: { 'x-session-token': sessToken },
         });
         const data = await res.json();
@@ -90,13 +92,13 @@ export default function TeacherDashboardPage() {
           throw new Error(data.error || 'Sınıf verileri alınamadı.');
         }
         setCards(data.classCards || []);
-        if (data.classCards?.length === 1) {
+        if (!silent && data.classCards?.length === 1) {
           setExpandedClassKey(data.classCards[0].classKey);
         }
       } catch (err: any) {
-        toast.error(err.message || 'Veriler yüklenemedi.');
+        if (!silent) toast.error(err.message || 'Veriler yüklenemedi.');
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     },
     []
@@ -117,7 +119,21 @@ export default function TeacherDashboardPage() {
     } catch {
       router.replace('/teacher/login');
     }
+    return () => {};
   }, [router, fetchResults]);
+
+  // Başka sekmeden anket doldurulup dönüldüğünde canlı güncelle
+  useEffect(() => {
+    if (!session || !token) return;
+    let lastRefresh = Date.now();
+    const onFocus = () => {
+      if (Date.now() - lastRefresh < 2500) return;
+      lastRefresh = Date.now();
+      fetchResults(session, token, true, true);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [session, token, fetchResults]);
 
   const handleCopy = (url: string, label: string) => {
     navigator.clipboard.writeText(url);

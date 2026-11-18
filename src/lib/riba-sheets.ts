@@ -118,15 +118,10 @@ export async function saveRibaConfig(
 export async function readRibaSubmissions(
   accessToken: string | object,
   spreadsheetId: string,
-  bypassCache = false
+  _bypassCache = true
 ): Promise<RibaSubmissionRecord[]> {
-  if (!bypassCache) {
-    const cached = responsesCache.get(spreadsheetId);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.data;
-    }
-  }
-
+  // Vercel sunucusuz (serverless) ortamlarda birden fazla bellek örneği çalıştığından
+  // daima E-Tablodan canlı okunur; böylece Excel çıktısı ile ekran sayıları birebir aynı kalır.
   let rows: any[][] = [];
   try {
     rows = await readFromSheet(
@@ -248,7 +243,13 @@ export async function readSchoolClassesAndTeachers(
   for (const t of teachers) allRawClasses.push(...t.classes);
   if (config?.customClasses) allRawClasses.push(...config.customClasses);
 
-  const uniqueClassNames = deduplicateClasses(allRawClasses).sort((a, b) =>
+  // Ders programı PDF satır kayması kaynaklı '<->' ile biten sahte ders adı artıklarını ele
+  const cleanedRawClasses = allRawClasses.filter((raw) => {
+    const t = (raw || '').trim();
+    return Boolean(t) && !t.endsWith('<->');
+  });
+
+  const uniqueClassNames = deduplicateClasses(cleanedRawClasses).sort((a, b) =>
     a.localeCompare(b, 'tr', { numeric: true })
   );
 

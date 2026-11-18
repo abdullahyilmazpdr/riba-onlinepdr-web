@@ -19,6 +19,8 @@ import {
 import { getClassBaseKey } from '@/lib/pdf-parser';
 import { RIBA_LEVELS, RibaLevel } from '@/lib/riba-data';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const auth = extractAuthFromRequest(req);
@@ -48,8 +50,7 @@ export async function GET(req: NextRequest) {
         storedConfig
       );
 
-    const bypassCache = req.nextUrl.searchParams.get('fresh') === '1';
-    const submissions = await readRibaSubmissions(accessToken, spreadsheetId, bypassCache);
+    const submissions = await readRibaSubmissions(accessToken, spreadsheetId, true);
 
     const origin = getPublicOrigin(req);
 
@@ -164,24 +165,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      origin,
-      isAdmin: isTeacherAdmin,
-      teacherName: currentTeacherName,
-      school: {
-        schoolKey: school.schoolKey,
-        schoolName: school.schoolName || 'Okul RİBA',
-        academicYear: school.academicYear || '2026-2027',
+    return NextResponse.json(
+      {
+        success: true,
+        origin,
+        isAdmin: isTeacherAdmin,
+        teacherName: currentTeacherName,
+        school: {
+          schoolKey: school.schoolKey,
+          schoolName: school.schoolName || 'Okul RİBA',
+          academicYear: school.academicYear || '2026-2027',
+        },
+        detection,
+        config: effectiveConfig,
+        totalSubmissions: submissions.length,
+        classCards,
+        schoolResults,
+        teacherFormUrls,
+        specialTargets: effectiveConfig.specialTargets || {},
       },
-      detection,
-      config: effectiveConfig,
-      totalSubmissions: submissions.length,
-      classCards,
-      schoolResults,
-      teacherFormUrls,
-      specialTargets: effectiveConfig.specialTargets || {},
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        },
+      }
+    );
   } catch (err: any) {
     console.error('RIBA results error:', err);
     return NextResponse.json(

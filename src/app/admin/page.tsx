@@ -90,6 +90,7 @@ export default function AdminDashboardPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [primaryLevel, setPrimaryLevel] = useState<RibaLevel>('ortaokul');
   const [enabledLevels, setEnabledLevels] = useState<RibaLevel[]>(['ortaokul']);
+  const [classOverrides, setClassOverrides] = useState<Record<string, RibaLevel>>({});
 
   const [teachers, setTeachers] = useState<TeacherItem[]>([]);
   const [teacherFormUrls, setTeacherFormUrls] = useState<
@@ -121,28 +122,31 @@ export default function AdminDashboardPage() {
   const [manualModal, setManualModal] = useState<ClassCardItem | null>(null);
 
   const loadSchoolData = useCallback(
-    async (key: string, sheetId: string, uid: string, fresh = false) => {
+    async (key: string, sheetId: string, uid: string, fresh = false, silent = false) => {
       if (!key || !sheetId) return;
-      setLoading(true);
+      if (!silent) setLoading(true);
       try {
         const googleToken = localStorage.getItem('google_access_token') || '';
         const headers: Record<string, string> = {};
         if (googleToken) headers.Authorization = `Bearer ${googleToken}`;
+        const tsNow = Date.now().toString();
 
         const setupUrl = new URL('/api/riba/setup', window.location.origin);
         setupUrl.searchParams.set('schoolKey', key);
         setupUrl.searchParams.set('spreadsheetId', sheetId);
         if (uid) setupUrl.searchParams.set('adminUid', uid);
+        setupUrl.searchParams.set('_t', tsNow);
 
         const resUrl = new URL('/api/riba/results', window.location.origin);
         resUrl.searchParams.set('schoolKey', key);
         resUrl.searchParams.set('spreadsheetId', sheetId);
         if (uid) resUrl.searchParams.set('adminUid', uid);
-        if (fresh) resUrl.searchParams.set('fresh', '1');
+        resUrl.searchParams.set('fresh', fresh ? '1' : '1');
+        resUrl.searchParams.set('_t', tsNow);
 
         const [setupRes, resultsRes] = await Promise.all([
-          fetch(setupUrl.toString(), { headers }),
-          fetch(resUrl.toString(), { headers }),
+          fetch(setupUrl.toString(), { headers, cache: 'no-store' }),
+          fetch(resUrl.toString(), { headers, cache: 'no-store' }),
         ]);
 
         const setupJson = await setupRes.json();
@@ -162,9 +166,12 @@ export default function AdminDashboardPage() {
             ? setupJson.config.enabledLevels
             : [nextPrimary];
 
-        setPrimaryLevel(nextPrimary);
-        setEnabledLevels(nextEnabled);
-        setActiveResultLevel(nextPrimary);
+        if (!silent) {
+          setPrimaryLevel(nextPrimary);
+          setEnabledLevels(nextEnabled);
+          setActiveResultLevel(nextPrimary);
+        }
+        setClassOverrides(setupJson.config?.classLevelOverrides || {});
         setTeachers(setupJson.teachers || []);
         setTeacherFormUrls(setupJson.teacherFormUrls || {});
 
@@ -174,9 +181,9 @@ export default function AdminDashboardPage() {
           setSpecialTargets(resJson.specialTargets || {});
         }
       } catch (err: any) {
-        toast.error(err.message || 'RİBA verileri yüklenemedi.');
+        if (!silent) toast.error(err.message || 'RİBA verileri yüklenemedi.');
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     },
     []
@@ -224,6 +231,50 @@ export default function AdminDashboardPage() {
 
     return () => unsub();
   }, [router, loadSchoolData]);
+
+  // Başka sekmede form doldurulup panele dönüldüğünde sayıları otomatik canlı yenile
+  useEffect(() => {
+    if (!activeKey || !activeSheetId) return;
+    let lastRefresh = Date.now();
+    const onFocus = () => {
+      if (Date.now() - lastRefresh < 2500) return;
+      lastRefresh = Date.now();
+      loadSchoolData(activeKey, activeSheetId, adminUid, true, true);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [activeKey, activeSheetId, adminUid, loadSchoolData]);
+
+  const handleChangeClassLevel = async (classKey: string, nextLvl: RibaLevel) => {
+    if (!activeKey || !activeSheetId) return;
+    const nextOverrides = { ...classOverrides, [classKey]: nextLvl };
+    const nextEnabled = ALL_LEVELS.filter((l) => l === nextLvl || enabledLevels.includes(l));
+    setClassOverrides(nextOverrides);
+    try {
+      const googleToken = localStorage.getItem('google_access_token') || '';
+      const res = await fetch('/api/riba/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(googleToken ? { Authorization: `Bearer ${googleToken}` } : {}),
+        },
+        body: JSON.stringify({
+          action: 'save-config',
+          schoolKey: activeKey,
+          spreadsheetId: activeSheetId,
+          adminUid,
+          primaryLevel,
+          enabledLevels: nextEnabled,
+          classLevelOverrides: nextOverrides,
+        }),
+      });
+      if (!res.ok) throw new Error('Sınıf kademesi güncellenemedi.');
+      toast.success(`Sınıf RİBA düzeyi "${RIBA_LEVELS[nextLvl].name}" olarak güncellendi.`);
+      loadSchoolData(activeKey, activeSheetId, adminUid, true, true);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
 
   const handleToggleLevel = (lvl: RibaLevel) => {
     setEnabledLevels((prev) => {
@@ -914,9 +965,20 @@ export default function AdminDashboardPage() {
                             <h3 className="font-extrabold text-slate-900 text-base">
                               {cls.className}
                             </h3>
-                            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
-                              {cls.levelName}
-                            </span>
+                            <select
+                              value={cls.level}
+                              onChange={(e) =>
+                                handleChangeClassLevel(cls.classKey, e.target.value as RibaLevel)
+                              }
+                              title="Bu şubenin RİBA form kademesini değiştir"
+                              className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 cursor-pointer focus:outline-none"
+                            >
+                              {ALL_LEVELS.map((l) => (
+                                <option key={l} value={l}>
+                                  {RIBA_LEVELS[l].name}
+                                </option>
+                              ))}
+                            </select>
                             {!cls.studentEligible && (
                               <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
                                 Öğrenci Formu Yok (MEB Kuralı)

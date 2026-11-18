@@ -3,6 +3,7 @@ import {
   RIBA_LEVELS,
   detectSchoolProfile,
   classifyClassForRiba,
+  isPreschoolClassName,
 } from '../src/lib/riba-data';
 import {
   computeClassRibaResult,
@@ -62,6 +63,20 @@ async function main() {
     ['ortaokul']
   );
   assert.deepEqual(detectSchoolProfile('Konya Anadolu Lisesi', []).recommendedLevels, ['lise']);
+  assert.deepEqual(
+    detectSchoolProfile('Meram Özel Eğitim Uygulama Okulu III. Kademe', []).recommendedLevels,
+    ['lise']
+  );
+  assert.deepEqual(
+    detectSchoolProfile('Özel Eğitim Uygulama Okulu II. Kademe', []).recommendedLevels,
+    ['ortaokul']
+  );
+  assert.deepEqual(
+    detectSchoolProfile('Özel Eğitim Uygulama Okulu I. Kademe', []).recommendedLevels,
+    ['ilkokul']
+  );
+  assert.equal(isPreschoolClassName('Özel Eğitim Uygulama Sınıfı A'), false);
+  assert.equal(isPreschoolClassName('Anasınıfı A'), true);
 
   assert.equal(
     classifyClassForRiba('1. Sınıf / A Şubesi', ['ilkokul'], 'ilkokul').studentEligible,

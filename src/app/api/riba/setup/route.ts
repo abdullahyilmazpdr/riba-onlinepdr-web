@@ -15,6 +15,8 @@ import { RIBA_LEVELS, RibaLevel } from '@/lib/riba-data';
 import { buildWhatsAppLink, deduplicateClasses, generatePassword, generateUsername } from '@/lib/pdf-parser';
 import { ensureSheetExists, updateSheetRange, readFromSheet } from '@/lib/sheets';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const auth = extractAuthFromRequest(req);
@@ -78,22 +80,29 @@ export async function GET(req: NextRequest) {
       ),
     }));
 
-    return NextResponse.json({
-      success: true,
-      origin,
-      school: {
-        schoolKey: school.schoolKey,
-        schoolName: school.schoolName || 'Okul RİBA',
-        district: school.district || '',
-        academicYear: school.academicYear || '2026-2027',
-        spreadsheetId,
+    return NextResponse.json(
+      {
+        success: true,
+        origin,
+        school: {
+          schoolKey: school.schoolKey,
+          schoolName: school.schoolName || 'Okul RİBA',
+          district: school.district || '',
+          academicYear: school.academicYear || '2026-2027',
+          spreadsheetId,
+        },
+        detection,
+        config: effectiveConfig,
+        classes,
+        teachers: enrichedTeachers,
+        teacherFormUrls,
       },
-      detection,
-      config: effectiveConfig,
-      classes,
-      teachers: enrichedTeachers,
-      teacherFormUrls,
-    });
+      {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+        },
+      }
+    );
   } catch (err: any) {
     console.error('RIBA setup GET error:', err);
     return NextResponse.json(
