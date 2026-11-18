@@ -1,0 +1,30 @@
+# riba.onlinepdr.com — MEB Online RİBA (Rehberlik İhtiyacı Belirleme Anketi) Otomasyonu
+
+> OnlinePDR ekosisteminin (onlinepdr.com, risk.onlinepdr.com, riba.onlinepdr.com) parçası olarak geliştirilen; Türkiye'deki okul psikolojik danışmanları / rehber öğretmenleri, sınıf öğretmenleri, öğrenciler ve veliler için ücretsiz, KVKK uyumlu, Google Drive E-Tablo tabanlı MEB resmi RİBA uygulama ve analiz platformu.
+
+## Temel Yetenekler ve MEB Mevzuatı Uyumu
+- **Resmî MEB ÖRGM RİBA Formları:** 11 resmi PDF anketi ve 8 sonuç çizelgesi temel alınarak tüm ikili karşılaştırma maddeleri ve hedef eşleştirmeleri doğrulanmıştır.
+- **Kademelere Göre Otomatik Kurallar:**
+  - **Okul Öncesi / Anaokulu:** 27 hedef; Veli (13 soru, %49) ve Öğretmen (13 soru, %51) formları. Öğrenci formu uygulanmaz.
+  - **İlkokul (ve Anasınıfı):** 38 hedef; Öğrenci formu **yalnızca 3. ve 4. sınıflara** uygulanır (15 soru, 0.27); Veli (13 soru, 0.36) ve Öğretmen (16 soru, 0.38) tüm sınıflara uygulanır. Kurumda anasınıfı varsa isteğe bağlı Okul Öncesi formları da aynı okul altında açılır.
+  - **Ortaokul / İHO:** 39 hedef; Öğrenci (18 soru, %39), Veli (16 soru, %28), Öğretmen (18 soru, %33).
+  - **Lise / Anadolu / Fen / MTAL / İHL:** 40 hedef; Öğrenci (20 soru, %39), Veli (19 soru, %28), Öğretmen (19 soru, %33).
+- **Psikometrik Skorlama:** Örneklem standart sapması (`ddof = 1`) ile T puanı `Z = ((f - ort) / ss) * 10 + 50` ve Ağırlıklı Standart Puan (ASP) anlık hesaplanır. Hem sınıf hem birleştirilmiş okul `.xlsx` çıktısı üretilir.
+
+## Karışıklığı Önleyen 3'lü Link Mimarisi
+1. **Öğretmen Formu (Mor):** Okul psikolojik danışmanı okul türünü onayladıktan sonra okul öğretmenler grubunda paylaşır.
+2. **Öğrenci Formu (Mavi, `/ogrenci-...`):** Sınıf rehber öğretmeni kendi panelinden alıp yalnızca öğrenci grubuna gönderir (Okul Öncesi ve İlkokul 1.-2. sınıflarda gizlidir).
+3. **Veli Formu (Yeşil, `/veli-...`):** Sınıf öğretmeni yalnızca veli WhatsApp grubuna gönderir; öğrenci formuyla karıştırılmaz.
+
+## Okul Risk Haritası (risk.onlinepdr.com) Entegrasyonu
+- `risk.onlinepdr.com` kullanan okullar aynı Google hesabıyla girdiklerinde şubelerini ve öğretmen şifrelerini yeniden tanımlamadan kullanır.
+- Öğretmenler RİBA paneline ek şifreye gerek kalmadan Risk Haritasındaki mevcut kullanıcı adı ve şifresiyle giriş yapar.
+
+## Güvenlik ve KVKK
+- Öğrenci isim listeleri ve anket yanıtları merkezi sunucu veritabanında değil, kurumun kendi Google Drive hesabındaki `RIBA_Ayarlar` ve `RIBA_Yanitlar` sekmelerinde saklanır.
+
+## İlgili Bağlantılar
+- Uygulama Girişi: https://riba.onlinepdr.com
+- Rehber & Tanıtım Sayfası: https://onlinepdr.com/riba/
+- Okul Risk Haritası: https://risk.onlinepdr.com
+- Genel, Yerel ve Özel Hedef Rehberi: https://onlinepdr.com/genel-yerel-ozel-hedef.html
