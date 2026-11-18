@@ -3,18 +3,73 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
+import {
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { getSchoolsByAdmin } from '@/lib/db';
 import toast from 'react-hot-toast';
 import { ClipboardCheck, ShieldCheck, ArrowRight, Users, Sparkles } from 'lucide-react';
+
+function buildGoogleProvider() {
+  const provider = new GoogleAuthProvider();
+  provider.addScope('https://www.googleapis.com/auth/drive.file');
+  provider.addScope('https://www.googleapis.com/auth/spreadsheets');
+  provider.setCustomParameters({
+    access_type: 'offline',
+    prompt: 'select_account',
+  });
+  return provider;
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
+  const finalizeSignedInUser = async (uid: string, accessToken?: string) => {
+    if (accessToken) {
+      localStorage.setItem('google_access_token', accessToken);
+    }
+    const schools = await getSchoolsByAdmin(uid);
+    if (schools.length > 0) {
+      const active = schools[0];
+      localStorage.setItem('admin_active_school_key', active.schoolKey);
+      if (active.spreadsheetId) {
+        localStorage.setItem('active_spreadsheet_id', active.spreadsheetId);
+      }
+      toast.success(`Hoş geldiniz! ${active.schoolName || 'Okul'} hesabınız eşleştirildi.`);
+    } else {
+      toast.success('Giriş başarılı! Okul bilgilerinizi tanımlayabilirsiniz.');
+    }
+    router.replace('/admin');
+  };
+
   useEffect(() => {
+    let mounted = true;
+    // Önce tam sayfa Google yönlendirme dönüşü varsa işle
+    getRedirectResult(auth)
+      .then(async (redirectRes) => {
+        if (redirectRes?.user && mounted) {
+          const credential = GoogleAuthProvider.credentialFromResult(redirectRes);
+          await finalizeSignedInUser(redirectRes.user.uid, credential?.accessToken);
+        }
+      })
+      .catch((err: any) => {
+        if (!mounted) return;
+        if (err?.code === 'auth/unauthorized-domain') {
+          toast.error(
+            `Bu alan adı (${window.location.hostname}) Firebase Authorized domains listesinde ekli değil.`
+          );
+        } else if (err?.message) {
+          toast.error(err.message);
+        }
+      });
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
@@ -30,42 +85,52 @@ export default function LoginPage() {
           return;
         } catch {}
       }
-      setCheckingAuth(false);
+      if (mounted) setCheckingAuth(false);
     });
-    return () => unsub();
+    return () => {
+      mounted = false;
+      unsub();
+    };
   }, [router]);
+
+  const handleGoogleRedirectSignIn = async () => {
+    setLoading(true);
+    try {
+      const provider = buildGoogleProvider();
+      await signInWithRedirect(auth, provider);
+    } catch (err: any) {
+      console.error('Google Redirect Sign-In error:', err);
+      toast.error(err?.message || 'Yönlendirme ile giriş başlatılamadı.');
+      setLoading(false);
+    }
+  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/drive.file');
-      provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-      provider.setCustomParameters({ prompt: 'select_account' });
-
+      const provider = buildGoogleProvider();
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
-      const accessToken = credential?.accessToken;
-      if (accessToken) {
-        localStorage.setItem('google_access_token', accessToken);
-      }
-
-      const schools = await getSchoolsByAdmin(result.user.uid);
-      if (schools.length > 0) {
-        const active = schools[0];
-        localStorage.setItem('admin_active_school_key', active.schoolKey);
-        if (active.spreadsheetId) {
-          localStorage.setItem('active_spreadsheet_id', active.spreadsheetId);
-        }
-        toast.success(`Hoş geldiniz! ${active.schoolName || 'Okul'} hesabınız eşleştirildi.`);
-      } else {
-        toast.success('Giriş başarılı! Okul bilgilerinizi tanımlayabilirsiniz.');
-      }
-
-      router.push('/admin');
+      await finalizeSignedInUser(result.user.uid, credential?.accessToken);
     } catch (err: any) {
       console.error('Google Sign-In error:', err);
-      toast.error(err?.message || 'Google ile giriş yapılamadı.');
+      if (
+        err?.code === 'auth/popup-blocked' ||
+        err?.code === 'auth/operation-not-supported-in-this-environment'
+      ) {
+        toast('Açılır pencere engellendi — tam sayfa Google girişine yönlendiriliyor...', {
+          icon: '🔄',
+        });
+        await handleGoogleRedirectSignIn();
+        return;
+      }
+      if (err?.code === 'auth/unauthorized-domain') {
+        toast.error(
+          `Bu alan adı (${window.location.hostname}) Firebase Console > Authentication > Authorized domains listesine eklenmelidir.`
+        );
+      } else {
+        toast.error(err?.message || 'Google ile giriş yapılamadı.');
+      }
       setLoading(false);
     }
   };
@@ -109,6 +174,15 @@ export default function LoginPage() {
           <ShieldCheck className="w-5 h-5 text-emerald-400" />
           {loading ? 'Bağlanıyor...' : 'Okul Google (Gmail) Hesabı ile Giriş Yap'}
           <ArrowRight className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleGoogleRedirectSignIn}
+          disabled={loading}
+          className="mt-2.5 w-full text-center text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline py-1.5 cursor-pointer disabled:opacity-50"
+        >
+          Açılır pencere engellenirse tam sayfa Google yönlendirmesi ile gir →
         </button>
 
         <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col gap-3 text-center">
